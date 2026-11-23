@@ -36,7 +36,7 @@ const ALL_TURKEY_PROVINCES: ProvinceEntry[] = fs.existsSync(provincesFilePath)
   : [];
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json({ limit: '4mb' }));
 

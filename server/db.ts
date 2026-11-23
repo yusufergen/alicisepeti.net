@@ -3,14 +3,32 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-export const DATA_DIR = path.resolve(process.cwd(), 'data');
-export const UPLOADS_DIR = path.resolve(process.cwd(), 'uploads', 'myk');
-export const AVATARS_DIR = path.resolve(process.cwd(), 'uploads', 'avatars');
+export const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(process.cwd(), 'data'));
+export const UPLOADS_DIR = path.join(DATA_DIR, 'uploads', 'myk');
+export const AVATARS_DIR = path.join(DATA_DIR, 'uploads', 'avatars');
 export const DB_PATH = path.join(DATA_DIR, 'talepagi.db');
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 fs.mkdirSync(AVATARS_DIR, { recursive: true });
+
+function migrateLegacyUploads(legacyDir: string, targetDir: string) {
+  if (!fs.existsSync(legacyDir)) return;
+  for (const entry of fs.readdirSync(legacyDir)) {
+    const src = path.join(legacyDir, entry);
+    const dest = path.join(targetDir, entry);
+    try {
+      if (fs.statSync(src).isFile() && !fs.existsSync(dest)) {
+        fs.copyFileSync(src, dest);
+      }
+    } catch {
+      // Ignore transient file read issues during legacy migration
+    }
+  }
+}
+
+migrateLegacyUploads(path.resolve(process.cwd(), 'uploads', 'myk'), UPLOADS_DIR);
+migrateLegacyUploads(path.resolve(process.cwd(), 'uploads', 'avatars'), AVATARS_DIR);
 
 export const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
