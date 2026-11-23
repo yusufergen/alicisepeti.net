@@ -288,7 +288,25 @@ const uploadRegFiles = multer({
 
 // Health endpoint
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, database: 'sqlite', brand: 'alicisepeti' });
+  try {
+    const row = db
+      .prepare(
+        `SELECT
+          (SELECT COUNT(*) FROM users) AS usersCount,
+          (SELECT COUNT(*) FROM buyer_requests) AS requestsCount`
+      )
+      .get() as { usersCount: number; requestsCount: number };
+    res.json({
+      ok: true,
+      database: 'sqlite',
+      connected: true,
+      seededUsers: row.usersCount,
+      seededRequests: row.requestsCount,
+      brand: 'alicisepeti',
+    });
+  } catch {
+    res.status(500).json({ ok: false, database: 'sqlite', connected: false });
+  }
 });
 
 // Turkey All 81 Provinces, All 973 Districts & All Neighborhoods API (Backed by local dataset + turkiyeapi.dev + SQLite cache)
