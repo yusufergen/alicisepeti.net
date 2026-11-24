@@ -9,6 +9,7 @@ import type {
   BuyerRequest,
   ContactMatch,
   PlatformSettings,
+  PreRequest,
   PublicPlatformConfig,
   PublicSummary,
   RequestStatus,
@@ -345,6 +346,18 @@ export const api = {
 
   deleteAdminReview: (id: number) =>
     apiFetch<{ ok: boolean }>(`/api/admin/reviews/${id}`, { method: 'DELETE' }),
+
+  createPreRequest: (payload: { full_name: string; email: string; address: string }) =>
+    apiFetch<{ pre_request: PreRequest }>('/api/pre-requests', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  getAdminPreRequests: () =>
+    apiFetch<{ pre_requests: PreRequest[] }>('/api/admin/pre-requests'),
+
+  deleteAdminPreRequest: (id: number) =>
+    apiFetch<{ ok: boolean }>(`/api/admin/pre-requests/${id}`, { method: 'DELETE' }),
 };
 
 export function getProtectedDocUrl(docPath: string): string {

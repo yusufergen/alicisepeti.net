@@ -6,6 +6,7 @@ import {
   Handshake,
   LayoutGrid,
   LogOut,
+  MailPlus,
   Megaphone,
   Menu,
   Plus,
@@ -54,6 +55,7 @@ export function AppShell({
     { path: '/panel', label: 'Alıcı Talepleri', icon: LayoutGrid },
     { path: '/panel/yeni-talep', label: 'Talep Oluştur', icon: Plus },
     { path: '/panel/taleplerim', label: 'Taleplerim ve Eşleşmeler', icon: FolderCheck },
+    { path: '/panel/on-talep', label: 'Ön Talep Formu', icon: MailPlus },
     { path: '/panel/profil', label: 'Profil ve MYK', icon: UserCheck },
     ...(user.role === 'admin'
       ? [{ path: '/panel/yonetim', label: 'Süper Admin Paneli', icon: ShieldAlert }]

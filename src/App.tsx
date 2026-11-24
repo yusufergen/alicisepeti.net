@@ -8,6 +8,7 @@ import { CreateRequestPage } from './pages/CreateRequestPage';
 import { LandingPage } from './pages/LandingPage';
 import { MyRequestsPage } from './pages/MyRequestsPage';
 import { PendingApprovalPage } from './pages/PendingApprovalPage';
+import { PreRequestPage } from './pages/PreRequestPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { RequestsFeedPage } from './pages/RequestsFeedPage';
 import { SuperAdminPage } from './pages/SuperAdminPage';
@@ -129,6 +130,15 @@ export default function App() {
     );
   }
 
+  if (path === '/on-talep') {
+    return (
+      <>
+        <Navbar user={user} currentPath={path} onNavigate={navigate} />
+        <PreRequestPage standalone onNavigate={navigate} />
+      </>
+    );
+  }
+
   if (path === '/giris' || path === '/kayit') {
     if (user) {
       const target =
@@ -216,6 +226,10 @@ export default function App() {
     pageTitle = 'Taleplerim ve Portföy Eşleşmeleri';
     breadcrumb = 'Taleplerim';
     content = <MyRequestsPage user={user} onNavigate={navigate} />;
+  } else if (activePanelPath === '/panel/on-talep') {
+    pageTitle = 'Ön Talep Formu';
+    breadcrumb = 'Ön Talep Formu';
+    content = <PreRequestPage standalone={false} onNavigate={navigate} />;
   } else if (activePanelPath === '/panel/profil') {
     pageTitle = 'Danışman Profili ve MYK Doğrulama';
     breadcrumb = 'Profil';

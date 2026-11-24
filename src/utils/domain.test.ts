@@ -13,6 +13,7 @@ import {
   isValidTurkishPhone,
   toTelHref,
   validateBuyerRequestInput,
+  validatePreRequestInput,
   validateReviewInput,
 } from './domain';
 import type { AdminUserRow, BuyerRequest } from '../types';
@@ -357,4 +358,22 @@ test('validateReviewInput validates integer star rating and comment length bound
   assert.equal(validateReviewInput({ rating: 5, comment: 'Çok şeffaf ve hızlı çalıştık.' }), null);
 });
 
-
+test('validatePreRequestInput validates full_name, email, and address', () => {
+  assert.ok(
+    validatePreRequestInput({ full_name: 'Al', email: 'ali@emlak.com', address: 'Kadıköy İstanbul' })
+  );
+  assert.ok(
+    validatePreRequestInput({ full_name: 'Ali Kaya', email: 'gecersiz-mail', address: 'Kadıköy İstanbul' })
+  );
+  assert.ok(
+    validatePreRequestInput({ full_name: 'Ali Kaya', email: 'ali@emlak.com', address: 'Abc' })
+  );
+  assert.equal(
+    validatePreRequestInput({
+      full_name: 'Ali Kaya',
+      email: 'ali@emlak.com',
+      address: 'Bağdat Caddesi No:12 Kadıköy, İstanbul',
+    }),
+    null
+  );
+});

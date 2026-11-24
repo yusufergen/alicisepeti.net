@@ -68,6 +68,18 @@ export function Navbar({ user, onNavigate, currentPath }: NavbarProps) {
           >
             MYK Doğrulama
           </a>
+          <a
+            href="/on-talep"
+            onClick={(e) => {
+              e.preventDefault();
+              onNavigate('/on-talep');
+            }}
+            className={`hover:text-slate-900 hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0 ${
+              currentPath === '/on-talep' ? 'text-blue-700 font-semibold' : ''
+            }`}
+          >
+            Ön Talep Formu
+          </a>
         </nav>
 
         <div className="shrink-0">

@@ -193,12 +193,21 @@ export function initDb(): void {
       FOREIGN KEY (target_agent_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS pre_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      full_name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      address TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_requests_city_district ON buyer_requests(city, district, status);
     CREATE INDEX IF NOT EXISTS idx_requests_agent ON buyer_requests(agent_id);
     CREATE INDEX IF NOT EXISTS idx_matches_request ON contact_matches(request_id);
     CREATE INDEX IF NOT EXISTS idx_audit_created ON admin_audit_logs(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_reviews_target ON agent_reviews(target_agent_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_reviews_request ON agent_reviews(request_id);
+    CREATE INDEX IF NOT EXISTS idx_pre_requests_created ON pre_requests(created_at DESC);
   `);
 
   // Safe migration for existing SQLite databases created before avatar_path was added
@@ -222,11 +231,65 @@ export function initDb(): void {
     seedDatabase();
   }
 
+  ensureDemoApprovedAgent();
+
   const reviewCountRow = db
     .prepare('SELECT COUNT(*) as count FROM agent_reviews')
     .get() as { count: number };
   if (reviewCountRow.count === 0) {
     seedInitialReviews();
+  }
+}
+
+function ensureDemoApprovedAgent(): void {
+  const existing = db
+    .prepare("SELECT id, status, role FROM users WHERE LOWER(email) = 'ahmet@kuzeyemlak.com'")
+    .get() as { id: number; status: string; role: string } | undefined;
+
+  const now = new Date().toISOString();
+  if (!existing) {
+    const ahmetDoc = createSampleMykSvg(
+      'seed-ahmet-myk.svg',
+      'Ahmet Yılmaz',
+      'Kuzey Sahil Gayrimenkul',
+      'YB0044/17UY0333-5/00/41892',
+      'İstanbul'
+    );
+    const phoneInUse = db
+      .prepare("SELECT id FROM users WHERE phone = '0532 412 88 10'")
+      .get() as { id: number } | undefined;
+    const demoPhone = phoneInUse ? '0532 412 88 99' : '0532 412 88 10';
+
+    db.prepare(`
+      INSERT INTO users (
+        full_name, email, phone, password_hash, office_name, city, district,
+        myk_number, ttbs_number, myk_doc_path, myk_doc_name, myk_doc_mime, avatar_path,
+        role, status, rejection_reason, bio, created_at, approved_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', 'agent', 'approved', '', ?, ?, ?)
+    `).run(
+      'Ahmet Yılmaz',
+      'ahmet@kuzeyemlak.com',
+      demoPhone,
+      hashPassword('Emlak123!'),
+      'Kuzey Sahil Gayrimenkul',
+      'İstanbul',
+      'Kadıköy',
+      'YB0044/17UY0333-5/00/41892',
+      '3408412',
+      ahmetDoc,
+      'myk-ahmet-yilmaz.svg',
+      'image/svg+xml',
+      'Kadıköy ve Bağdat Caddesi aksında lüks konut ve yatırım danışmanlığı.',
+      now,
+      now
+    );
+    return;
+  }
+
+  if (existing.status !== 'approved' || existing.role !== 'agent') {
+    db.prepare(
+      "UPDATE users SET status = 'approved', role = 'agent', rejection_reason = '', approved_at = COALESCE(approved_at, ?) WHERE id = ?"
+    ).run(now, existing.id);
   }
 }
 

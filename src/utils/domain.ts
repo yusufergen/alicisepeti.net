@@ -443,4 +443,23 @@ export function validateReviewInput(input: {
   return null;
 }
 
+export function validatePreRequestInput(input: {
+  full_name: string;
+  email: string;
+  address: string;
+}): string | null {
+  const fullName = (input.full_name || '').trim();
+  const email = (input.email || '').trim();
+  const address = (input.address || '').trim();
 
+  if (fullName.length < 3) {
+    return 'İsim Soyisim en az 3 karakter olmalıdır.';
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return 'Lütfen geçerli bir e-posta adresi girin.';
+  }
+  if (address.length < 5) {
+    return 'Lütfen en az 5 karakter uzunluğunda bir adres girin.';
+  }
+  return null;
+}

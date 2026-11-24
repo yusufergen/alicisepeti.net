@@ -238,3 +238,10 @@ export interface AdminOverview {
   settings: PlatformSettings;
 }
 
+export interface PreRequest {
+  id: number;
+  full_name: string;
+  email: string;
+  address: string;
+  created_at: string;
+}

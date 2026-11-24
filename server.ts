@@ -19,6 +19,7 @@ import {
   formatTurkishPhone,
   isValidTurkishPhone,
   validateBuyerRequestInput,
+  validatePreRequestInput,
   validateReviewInput,
 } from './src/utils/domain.ts';
 
@@ -2122,6 +2123,69 @@ app.delete('/api/admin/reviews/:id', requireAdmin, (req: AuthedRequest, res: Res
     'review',
     id,
     `Danışman #${existing.target_agent_id} (${existing.rating}/5)`
+  );
+  res.json({ ok: true });
+});
+
+// Public Pre-Request (Ön Talep Formu) submission endpoint
+app.post('/api/pre-requests', (req: Request, res: Response) => {
+  const body = req.body as { full_name?: string; email?: string; address?: string };
+  const fullName = (body.full_name || '').trim();
+  const email = (body.email || '').trim().toLowerCase();
+  const address = (body.address || '').trim();
+
+  const validationError = validatePreRequestInput({
+    full_name: fullName,
+    email,
+    address,
+  });
+  if (validationError) {
+    res.status(400).json({ error: validationError });
+    return;
+  }
+
+  const createdAt = new Date().toISOString();
+  const result = db
+    .prepare(
+      'INSERT INTO pre_requests (full_name, email, address, created_at) VALUES (?, ?, ?, ?)'
+    )
+    .run(fullName, email, address, createdAt);
+
+  const created = db
+    .prepare('SELECT id, full_name, email, address, created_at FROM pre_requests WHERE id = ?')
+    .get(result.lastInsertRowid);
+
+  res.status(201).json({ pre_request: created });
+});
+
+// Super Admin: List & delete pre-requests
+app.get('/api/admin/pre-requests', requireAdmin, (_req: AuthedRequest, res: Response) => {
+  const rows = db
+    .prepare(
+      'SELECT id, full_name, email, address, created_at FROM pre_requests ORDER BY created_at DESC, id DESC'
+    )
+    .all();
+  res.json({ pre_requests: rows });
+});
+
+app.delete('/api/admin/pre-requests/:id', requireAdmin, (req: AuthedRequest, res: Response) => {
+  const id = Number(req.params.id);
+  const existing = db
+    .prepare('SELECT id, full_name, email FROM pre_requests WHERE id = ?')
+    .get(id) as { id: number; full_name: string; email: string } | undefined;
+
+  if (!existing) {
+    res.status(404).json({ error: 'Ön talep kaydı bulunamadı.' });
+    return;
+  }
+
+  db.prepare('DELETE FROM pre_requests WHERE id = ?').run(id);
+  logAdminAction(
+    req.user!,
+    'Ön Talep Kaydı Silindi',
+    'pre_request',
+    id,
+    `${existing.full_name} (${existing.email})`
   );
   res.json({ ok: true });
 });

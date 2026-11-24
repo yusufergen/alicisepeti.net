@@ -2,13 +2,17 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   Award,
+  Check,
   CheckCircle2,
   ClipboardList,
+  Copy,
   Database,
   Edit3,
+  ExternalLink,
   Eye,
   Handshake,
   KeyRound,
+  MailPlus,
   Plus,
   RefreshCw,
   Save,
@@ -36,6 +40,7 @@ import type {
   BuyerRequest,
   ContactMatch,
   PlatformSettings,
+  PreRequest,
   RequestStatus,
 } from '../types';
 import {
@@ -46,7 +51,15 @@ import {
   formatRelativeDateTR,
 } from '../utils/domain';
 
-type AdminTab = 'overview' | 'users' | 'requests' | 'matches' | 'reviews' | 'sessions' | 'settings';
+type AdminTab =
+  | 'overview'
+  | 'users'
+  | 'requests'
+  | 'matches'
+  | 'reviews'
+  | 'pre_requests'
+  | 'sessions'
+  | 'settings';
 
 interface SuperAdminPageProps {
   currentUserId: number;
@@ -65,6 +78,7 @@ export function SuperAdminPage({ currentUserId, onConfigChanged }: SuperAdminPag
   const [requests, setRequests] = useState<BuyerRequest[]>([]);
   const [matches, setMatches] = useState<ContactMatch[]>([]);
   const [reviews, setReviews] = useState<AgentReview[]>([]);
+  const [preRequests, setPreRequests] = useState<PreRequest[]>([]);
   const [sessions, setSessions] = useState<AdminSessionRow[]>([]);
   const [auditLogs, setAuditLogs] = useState<AdminAuditLog[]>([]);
   const [settings, setSettings] = useState<PlatformSettings>({
@@ -89,6 +103,8 @@ export function SuperAdminPage({ currentUserId, onConfigChanged }: SuperAdminPag
   const [reqCityFilter, setReqCityFilter] = useState('all');
 
   const [matchSearch, setMatchSearch] = useState('');
+  const [preRequestSearch, setPreRequestSearch] = useState('');
+  const [copiedPreReqLink, setCopiedPreReqLink] = useState(false);
 
   // Modals & Inline Confirmation states (no window.confirm)
   const [userModalState, setUserModalState] = useState<{
@@ -102,6 +118,7 @@ export function SuperAdminPage({ currentUserId, onConfigChanged }: SuperAdminPag
   const [confirmDeleteRequestId, setConfirmDeleteRequestId] = useState<number | null>(null);
   const [confirmDeleteMatchId, setConfirmDeleteMatchId] = useState<number | null>(null);
   const [confirmDeleteReviewId, setConfirmDeleteReviewId] = useState<number | null>(null);
+  const [confirmDeletePreRequestId, setConfirmDeletePreRequestId] = useState<number | null>(null);
   const [confirmRevokeAll, setConfirmRevokeAll] = useState(false);
 
   const [actionLoading, setActionLoading] = useState(false);
@@ -118,12 +135,13 @@ export function SuperAdminPage({ currentUserId, onConfigChanged }: SuperAdminPag
     setLoading(true);
     setError('');
     try {
-      const [ov, usr, reqs, mtc, rev, ses, logs, st] = await Promise.all([
+      const [ov, usr, reqs, mtc, rev, preReqs, ses, logs, st] = await Promise.all([
         api.getAdminOverview(),
         api.getAdminUsers(),
         api.getAdminRequests(),
         api.getAdminMatches(),
         api.getAdminReviews(),
+        api.getAdminPreRequests(),
         api.getAdminSessions(),
         api.getAdminAuditLogs(),
         api.getAdminSettings(),
@@ -133,6 +151,7 @@ export function SuperAdminPage({ currentUserId, onConfigChanged }: SuperAdminPag
       setRequests(reqs.requests);
       setMatches(mtc.matches);
       setReviews(rev.reviews);
+      setPreRequests(preReqs.pre_requests);
       setSessions(ses.sessions);
       setAuditLogs(logs.logs);
       setSettings(st.settings);
@@ -201,6 +220,17 @@ export function SuperAdminPage({ currentUserId, onConfigChanged }: SuperAdminPag
         .includes(q)
     );
   }, [matches, matchSearch]);
+
+  const filteredPreRequests = useMemo(() => {
+    const q = preRequestSearch.trim().toLocaleLowerCase('tr-TR');
+    if (!q) return preRequests;
+    return preRequests.filter((item) =>
+      [item.full_name, item.email, item.address]
+        .join(' ')
+        .toLocaleLowerCase('tr-TR')
+        .includes(q)
+    );
+  }, [preRequests, preRequestSearch]);
 
   const pendingUsers = useMemo(() => users.filter((u) => u.status === 'pending'), [users]);
 
@@ -313,6 +343,34 @@ export function SuperAdminPage({ currentUserId, onConfigChanged }: SuperAdminPag
     }
   };
 
+  const handleDeletePreRequest = async (preReqId: number) => {
+    setActionLoading(true);
+    setError('');
+    try {
+      await api.deleteAdminPreRequest(preReqId);
+      setPreRequests((prev) => prev.filter((p) => p.id !== preReqId));
+      setConfirmDeletePreRequestId(null);
+      showToast(`Ön talep #${preReqId} silindi.`);
+      refreshAuditAndOverview();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ön talep silinemedi.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCopyPreRequestLink = async () => {
+    if (typeof window === 'undefined') return;
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/on-talep`);
+      setCopiedPreReqLink(true);
+      showToast('Ön talep formu bağlantısı kopyalandı.');
+      window.setTimeout(() => setCopiedPreReqLink(false), 2500);
+    } catch {
+      // ignore clipboard errors
+    }
+  };
+
   const handleRevokeSession = async (sessionId: number) => {
     setActionLoading(true);
     setError('');
@@ -381,6 +439,7 @@ export function SuperAdminPage({ currentUserId, onConfigChanged }: SuperAdminPag
     { id: 'requests', label: 'Tüm Talepler', count: requests.length, icon: ClipboardList },
     { id: 'matches', label: 'Eşleşmeler', count: matches.length, icon: Handshake },
     { id: 'reviews', label: 'Güven Puanları', count: reviews.length, icon: Award },
+    { id: 'pre_requests', label: 'Ön Talepler', count: preRequests.length, icon: MailPlus },
     { id: 'sessions', label: 'Oturumlar & Kayıtlar', count: sessions.length, icon: KeyRound },
     { id: 'settings', label: 'Sistem Ayarları', icon: Settings },
   ];
@@ -1253,6 +1312,141 @@ export function SuperAdminPage({ currentUserId, onConfigChanged }: SuperAdminPag
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4B: PRE-REQUESTS (ÖN TALEPLER) */}
+          {activeTab === 'pre_requests' && (
+            <div className="space-y-4">
+              <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div>
+                  <h3 className="font-display text-base font-semibold text-slate-900">
+                    Ön Talep Başvuruları ({filteredPreRequests.length})
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    /on-talep bağlantısı üzerinden ilk 3 ay ücretsiz lansman için ön kayıt bırakan
+                    potansiyel üyeler burada listelenir.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative">
+                    <Search
+                      className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"
+                      aria-hidden="true"
+                    />
+                    <input
+                      type="text"
+                      value={preRequestSearch}
+                      onChange={(e) => setPreRequestSearch(e.target.value)}
+                      placeholder="İsim, e-posta veya adres ara..."
+                      className="h-9 pl-9 pr-3 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-700 w-56"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyPreRequestLink}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg whitespace-nowrap"
+                  >
+                    {copiedPreReqLink ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-700" aria-hidden="true" />
+                        <span className="text-emerald-800">Link Kopyalandı</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" aria-hidden="true" />
+                        <span>Form Linkini Kopyala</span>
+                      </>
+                    )}
+                  </button>
+                  <a
+                    href="/on-talep"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg whitespace-nowrap"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span>Formu Aç</span>
+                  </a>
+                </div>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50 text-xs font-medium text-slate-500">
+                        <th className="py-3 px-4">İsim Soyisim</th>
+                        <th className="py-3 px-4">E-posta</th>
+                        <th className="py-3 px-4">Adres</th>
+                        <th className="py-3 px-4">Başvuru Tarihi</th>
+                        <th className="py-3 px-4 text-right">İşlem</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 text-xs">
+                      {filteredPreRequests.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="py-10 text-center text-slate-500">
+                            {preRequests.length === 0
+                              ? 'Henüz ön talep formundan kayıt gönderilmedi. Form linkini kopyalayıp potansiyel üyelere gönderebilirsiniz.'
+                              : 'Arama kriterine uyan ön talep kaydı bulunamadı.'}
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredPreRequests.map((item) => (
+                          <tr key={item.id} className="hover:bg-slate-50/70">
+                            <td className="py-3.5 px-4 font-semibold text-slate-900 whitespace-nowrap">
+                              {item.full_name}
+                            </td>
+                            <td className="py-3.5 px-4 font-mono text-slate-700 whitespace-nowrap">
+                              {item.email}
+                            </td>
+                            <td className="py-3.5 px-4 text-slate-600 max-w-md">
+                              {item.address}
+                            </td>
+                            <td className="py-3.5 px-4 text-slate-500 tabular-nums whitespace-nowrap">
+                              {new Date(item.created_at).toLocaleString('tr-TR', {
+                                dateStyle: 'short',
+                                timeStyle: 'short',
+                              })}
+                            </td>
+                            <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                              {confirmDeletePreRequestId === item.id ? (
+                                <span className="inline-flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    disabled={actionLoading}
+                                    onClick={() => handleDeletePreRequest(item.id)}
+                                    className="px-2.5 py-1.5 font-semibold text-white bg-red-600 hover:bg-red-700 rounded-md"
+                                  >
+                                    Sil
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmDeletePreRequestId(null)}
+                                    className="px-2 py-1.5 text-slate-600 hover:bg-slate-100 rounded-md"
+                                  >
+                                    İptal
+                                  </button>
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmDeletePreRequestId(item.id)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 font-medium text-red-700 border border-red-200 hover:bg-red-50 rounded-md"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                                  <span>Sil</span>
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
